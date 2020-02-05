@@ -1,0 +1,68 @@
+SELECT CONVERT(CHAR(11), dateadd(dd, -2, Cast((SELECT LastRollOverDate FROM RetailConfiguration) as DateTime)), 103)
+
+
+SELECT * FROM Patients
+SELECT * FROM Patients WHERE Id IN (SELECT DISTINCT CustomerId FROM TransactionItems) OR Id IN (SELECT DISTINCT CustomerId FROM Transactions)
+
+SELECT * FROM Transactions 
+INNER JOIN (SELECT CustomerId, Max(EntryDate) as MaxDate FROM Transactions GROUP BY CustomerId)
+tmp ON Transactions.CustomerId = tmp.CustomerId AND Transactions.EntryDate = tmp.MaxDate AND Transactions.CustomerId > 0 AND
+Transactions.CustomerId IN (SELECT ID FROM Patients)
+ORDER BY Id DESC
+
+SELECT * FROM TransactionItems WHERE TransactionId IN 
+(SELECT Id FROM Transactions 
+INNER JOIN(SELECT CustomerId, Max(EntryDate) as MaxDate FROM Transactions GROUP BY CustomerId)
+tmp ON Transactions.CustomerId = tmp.CustomerId and Transactions.EntryDate = tmp.MaxDate and Transactions.CustomerId > 0 AND
+Transactions.CustomerId IN (SELECT ID FROM Patients)
+)
+OR TransactionId IN 
+(SELECT DISTINCT TransactionId FROM TransactionItems
+INNER JOIN (SELECT CustomerId, Max(EntryDate) as MaxDate FROM TransactionItems GROUP BY CustomerId)
+tmp ON TransactionItems.CustomerId = tmp.CustomerId AND TransactionItems.EntryDate = tmp.MaxDate AND TransactionItems.CustomerId > 0 AND
+TransactionItems.CustomerId IN (SELECT ID FROM Patients)
+)
+ORDER BY TransactionId DESC, Id DESC
+
+SELECT * FROM (
+ SELECT *, ROW_NUMBER() OVER (PARTITION BY CustomerId ORDER BY EntryDate DESC, Id DESC) rowNumber
+ FROM TransactionItems WHERE TransactionItems.CustomerId IN (SELECT ID FROM Patients)) temp WHERE rowNumber = 1
+ORDER By TransactionId DESC
+
+
+SELECT CAST(PosNote as char) FROM Patients WHERE PosNote <> 0x
+
+SELECT * FROM Patients where Booleans = CAST(booleans as smallint) | 0x1000 or Booleans = CAST(booleans as smallint) | 0x2000 or Booleans = CAST(booleans as smallint) | 0x4000
+
+
+declare @SearchKey nvarchar(100)
+set @SearchKey='SClub'
+
+select prod.Id, Description, pharmacode, c.Name ClubName
+from
+( 
+select Id, Description, pharmacode, specialdata,  specialdata.query('/Params/Param[@Key=sql:variable("@SearchKey")]') as xml ,specialdata.query('/Params/Param[@Key=sql:variable("@SearchKey")]').value('(/Param/@Value)[1]', 'int') as clubId from 
+( 
+select Id, Description, pharmacode, cast(specialdata as nvarchar(max)) specialdataraw, cast(specialdata as xml) specialdata from products where specialdata <> 0x and cast(specialdata as nvarchar(max)) like '%Param Key="' + @SearchKey + '"%' 
+) prod
+) prod
+inner join Clubs c
+on c.Id = clubId
+
+
+SELECT ProductId, SUM(Variance) AS Quantity, MONTH(MovementDate) AS Month, YEAR(MovementDate) AS Year
+  FROM [StockMovement]
+  WHERE (MovementType = 2 OR MovementType = 6 OR MovementType = 10) 
+  AND YEAR(MovementDate) > 2017
+ GROUP BY MONTH(MovementDate), YEAR(MovementDate), ProductId
+ 
+ 
+SELECT ProductId AS StockID,
+       '1/' + Cast(MONTH(MovementDate) AS varchar) + '/' + CAST(YEAR(MovementDate) AS varchar) AS Month,  
+       SUM(Variance) * -1 AS Quantity, 
+	   CAST(SUM(MovementValue) * -100 AS int) AS ValueSold,
+	   MONTH(MovementDate) AS Month, YEAR(MovementDate) AS Year
+  FROM [StockMovement]
+  WHERE (MovementType = 2 OR MovementType = 6 OR MovementType = 10) 
+  AND YEAR(MovementDate) > 2017
+ GROUP BY ProductId, MONTH(MovementDate), YEAR(MovementDate) 
