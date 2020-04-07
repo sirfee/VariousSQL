@@ -1,0 +1,115 @@
+Within LOTS, names and addresses are all stored upper case.  User sometimes prefer to change their current case to use the Toniq Mixed case logic.  While this is not a perfect solution these scripts are a best attempt at fixing the majority of names/addresses.
+
+Step-by-step guide
+ Create the capitalisation function by running this statement.
+
+USE [ToniqDatabase]
+
+GO
+
+CREATE FUNCTION [dbo].[CapitalizeFirstLetter]
+
+(--string need to format
+
+@string VARCHAR(200))--increase the variable size depending on your needs. The largest we are updating here is 50 chars so this is ample
+
+RETURNS VARCHAR(200) AS
+
+BEGIN
+
+  --Declare Variables
+
+  DECLARE @Index INT,
+
+  @ResultString VARCHAR(200)--result string size should equal to the @string variable size
+
+  --Initialize the variables
+
+  SET @Index = 1
+
+  SET @ResultString = ''
+
+  --Run the Loop until END of the string
+
+  WHILE (@Index <LEN(@string)+1) BEGIN
+
+    --first letter of the string
+
+    IF (@Index = 1) BEGIN
+
+      --make the first letter capital
+
+      SET @ResultString = @ResultString + UPPER(SUBSTRING(@string, @Index, 1))
+
+      SET @Index = @Index+ 1--increase the index
+
+    END
+
+    -- IF the previous character is space or '-' or '(' or ')' or ''' and MC and MAC (for MacMillan or McMillan)
+
+    ELSE IF (SUBSTRING(@string, @Index-1, 1) =' ' or SUBSTRING(@string, @Index-1, 1) ='-' or SUBSTRING(@string, @Index-1, 1) ='(' or
+
+             SUBSTRING(@string, @Index-1, 1) =')' or SUBSTRING(@string, @Index-1, 1) ='''' or
+
+             ((SUBSTRING(@string, @Index-3, 1) =' ' or SUBSTRING(@string, @Index-3, 1) ='-') and SUBSTRING(@string, @Index-2, 1) ='M' and SUBSTRING(@string, @Index-1, 1) = 'C') or
+
+             ((SUBSTRING(@string, @Index-4, 1) =' ' or SUBSTRING(@string, @Index-4, 1) ='-') and SUBSTRING(@string, @Index-3, 1) ='M'  and SUBSTRING(@string, @Index-2, 1) = 'A' and SUBSTRING(@string, @Index-1, 1) = 'C'))
+
+    BEGIN
+
+      --make the letter capital
+
+      SET @ResultString = @ResultString + UPPER(SUBSTRING(@string,@Index, 1))
+
+      SET @Index = @Index +1--increase the index
+
+    END ELSE BEGIN
+
+         -- all others make the letter simple
+
+      SET @ResultString = @ResultString + LOWER(SUBSTRING(@string,@Index, 1))
+
+      SET @Index = @Index +1--increase the index
+
+    END
+
+  END--END of the loop
+
+  IF (@@ERROR <> 0) BEGIN
+
+    -- any error occur return the SEND string
+
+    SET @ResultString = @string
+
+  END
+
+  -- IF no error found return the new string
+
+  RETURN @ResultString
+
+END
+
+
+
+Update the fields using this statement.
+
+USE [ToniqDatabase]
+GO
+UPDATE [Patients] SET FirstNames = dbo.CapitalizeFirstLetter([FirstNames]),
+                      LastName = dbo.CapitalizeFirstLetter(LastName),
+                      Title = dbo.CapitalizeFirstLetter(Title),
+                      Address1 = dbo.CapitalizeFirstLetter(Address1),
+                      Address2 = dbo.CapitalizeFirstLetter(Address2),
+                      Address3 = dbo.CapitalizeFirstLetter(Address3);
+
+
+
+Tidy up via removing the function we created using this statement.
+
+USE [ToniqDatabase]
+
+GO
+
+DROP FUNCTION [dbo].[CapitalizeFirstLetter]
+
+GO
